@@ -23,7 +23,8 @@ def download_pdf(link, barcode):
 
 
 def download_pages(link, pages, barcode):
-  print 'Downloading pages ...'
+  print 'Downloading pages ... %4s/%-4s' % (0, pages),
+  sys.stdout.flush()
   
   pages = int(pages)
   for i in range (1, pages + 1):
@@ -39,6 +40,12 @@ def download_pages(link, pages, barcode):
 
     if not os.path.isfile(tifpath):
       os.system('wget %s -O %s > /tmp/%s 2>&1' % (url, tifpath, barcode))
+
+    print '\b\b\b\b\b\b\b\b\b\b\b',
+    print '%4s/%-4s' % (i, pages),
+    sys.stdout.flush()
+
+  print ''
 
 
 def get_link(td):
@@ -100,12 +107,15 @@ def main():
     os.system('mkdir -p ./pdfs')
     download_meta(sys.argv[i])
 
+    print '____________________________________________________________'
     print '%-10s = %s' % ('Title', metadata['Title'])
     print '%-10s = %s' % ('Author', metadata['Author1'])
     print '%-10s = %s' % ('Pages', metadata['TotalPages'])
 
     pdfpath = './pdfs/' + sys.argv[i] + '.pdf'
-    
+    if os.path.isfile(pdfpath):
+      continue
+  
     if havepdf == 0:
       download_pages(metadata['link'], metadata['TotalPages'], sys.argv[i])
 
@@ -118,6 +128,9 @@ def main():
       link = download_pdf(metadata['link'], sys.argv[i])
       link = link + '?sequence=1'
       os.system('wget %s -O %s' % (link, pdfpath))
+   
+    #os.system('rm -rf ./%s' % sys.argv[i])
+    print '____________________________________________________________'
 
 
 if __name__ == '__main__':
