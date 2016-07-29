@@ -4,6 +4,8 @@ import sys
 from lxml import etree
 from urlparse import urlparse
 
+from pyDLI import *
+
 #metadata = {}
 #havepdf = 0
 #
@@ -66,9 +68,9 @@ from urlparse import urlparse
 #    havepdf = 1
 #
 #
-def extract_meta(metapath):
-  with open(metapath, 'r') as metafile:
-    data = metafile.read().replace('\n', '')
+def extract_meta(htmlPath, metaFile):
+  with open(htmlPath, 'r') as htmlFile:
+    data = htmlFile.read().replace('\n', '')
 
   html = etree.HTML(data)                                                     
   tr = html.xpath('//table/tr')
@@ -80,32 +82,67 @@ def extract_meta(metapath):
       if a:
         metaData = a[0].attrib['href']
         metaTokens = metaData.split('&')
+        metaData = ''
         for j in range(0, len(metaTokens)):
+          if metaTokens[j].startswith('title1'):
+            title = metaTokens[j].split('=')[1]
+            title = title.lstrip()
+            title = title.rstrip()
+            metaData = metaData + title
+          if metaTokens[j].startswith('author1'):
+            author = metaTokens[j].split('=')[1]
+            author = author.lstrip()
+            author = author.rstrip()
+            metaData = metaData + '&' + author
           if metaTokens[j].startswith('barcode'):
-            print 'barcode = %s' % (metaTokens[j].split('=')[1])
-          if metaTokens[j].startswith('pages'):
-            print 'pages = %s' % (metaTokens[j].split('=')[1])
-          if metaTokens[j].startswith('url'):
-            print 'url = %s' % (metaTokens[j].split('=')[1])
-        print ''
-        print ''
+            barcode = metaTokens[j].split('=')[1]
+            barcode = barcode.lstrip()
+            barcode = barcode.rstrip()
+            metaData = metaData + '&' + barcode + '\n'
+        try:   
+          metaFile.write(metaData)
+        except:
+          pass
 
 
 def download_meta():
   print 'Downloading metadata ...'
-  #totalBooks = 25176
-  totalBooks = 25
+  totalBooks = 25176
   perPage = 25
+  metaPath = './metafile'
+
+  if os.path.isfile(metaPath):
+    return
+
+  metaFile = open(metaPath, 'w')
+
   for i in range(0, totalBooks/perPage):
-    listStart = i * 25
+    listStart = i * perPage
     metaUrl = 'http://dli.gov.in/cgi-bin/advsearch_db.cgi?perPage=25&listStart=' + str(listStart) + '&r1=V1&title1=&author1=&year1=&year2=&subject1=Any&language1=Bengali&scentre=Any&search=Search HTTP/1.1\\r\\n'
-    metaPath = './metafile'
-    os.system('wget "%s" -O %s' % (metaUrl, metaPath))
-    extract_meta(metaPath)
+    htmlPath = './htmlfile'
+    os.system('wget "%s" -O %s' % (metaUrl, htmlPath))
+    extract_meta(htmlPath, metaFile)
+
+
+def download_files(filerange):
+  start = int(filerange.split('-')[0])
+  end = int(filerange.split('-')[1])
+
+  metaPath = './metafile'
+  with open(metaPath) as f:
+    fileList = f.readlines()
+
+  size = 0
+  for i in range(0, (end - start + 1)):
+    seq = i + start
+    barcode = fileList[seq].split('&')[2]
+    size = size + get_files(barcode.rstrip(), seq)
+    print 'Downloaded %sM' % (size / (1024 * 1024))
 
 
 def main():
   download_meta()
+  download_files(sys.argv[1])
 
 #  print '____________________________________________________________'
 #  print '%-10s = %s' % ('Title', metadata['Title'])

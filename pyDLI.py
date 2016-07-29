@@ -90,16 +90,30 @@ def extract_meta(metapath):
 
 def download_meta(barcode):
   print 'Downloading metadata ...'
-  metaurl = 'http://www.dli.ernet.in/cgi-bin/DBscripts/allmetainfo.cgi?barcode=' + barcode
+  metaurl = 'http://www.dli.gov.in/cgi-bin/DBscripts/allmetainfo.cgi?barcode=' + barcode
   metapath = './' + barcode + '/' + barcode
   os.system('wget %s -O %s > /tmp/%s 2>&1' % (metaurl, metapath, barcode))
 
   extract_meta(metapath)
 
 
+def get_download_size(barcode):
+  dirName = './' + barcode
+  fileList = os.listdir(dirName)                                     
+  size = 0
+
+  for i in range(0, len(fileList)):                                             
+    if fileList[i].startswith('000') and fileList[i].endswith('tif'):           
+      st = os.stat(dirName + '/' + fileList[i])                            
+      size = size + st.st_size                                                 
+  
+  return size 
+
+
 def main():
   global havepdf
-  
+ 
+  size = 0 
   for i in range (1, len(sys.argv)):
     havepdf = 0
 
@@ -128,9 +142,63 @@ def main():
       link = download_pdf(metadata['link'], sys.argv[i])
       link = link + '?sequence=1'
       os.system('wget %s -O %s' % (link, pdfpath))
-   
-    #os.system('rm -rf ./%s' % sys.argv[i])
+
+    size = size + get_download_size(sys.argv[i])
+    os.system('rm -rf ./%s' % sys.argv[i])
+    print 'Downloaded %sM' % (size/(1024*1024))
     print '____________________________________________________________'
+
+
+def get_index(i):
+  if i <= 9:
+    return '0000' + str(i)
+  if i > 9 and i <= 99:
+    return '000' + str(i)
+  if i > 99 and i <= 999:
+    return '00' + str(i)
+  if i > 999 and i <= 9999:
+    return '0' + str(i)
+  if i > 9999 and i <= 99999:
+    return str(i)
+
+
+def get_files(barcode, index):
+  global havepdf
+ 
+  size = 0 
+  havepdf = 0
+
+  os.system('mkdir -p ./%s' % barcode)
+  os.system('mkdir -p ./pdfs')
+  download_meta(barcode)
+
+  print '____________________________________________________________'
+  print '%-10s = %s' % ('Title', metadata['Title'])
+  print '%-10s = %s' % ('Author', metadata['Author1'])
+  print '%-10s = %s' % ('Pages', metadata['TotalPages'])
+
+  index = get_index(index)
+  pdfpath = './pdfs/' + index + '-' + barcode + '-' + metadata['Title'] +'.pdf'
+  if os.path.isfile(pdfpath):
+    return 0
+  
+  if havepdf == 0:
+    download_pages(metadata['link'], metadata['TotalPages'], barcode)
+
+    tifpath = './' + barcode
+
+    print 'Merging pages ...'
+    os.system('tiffcp %s/0*.tif %s/result.tif > /tmp/%s 2>&1' % (tifpath, tifpath, barcode))
+    os.system('tiff2pdf %s/result.tif -o "%s" -p A2 -F' % (tifpath, pdfpath))
+  else:
+    link = download_pdf(metadata['link'], barcode)
+    link = link + '?sequence=1'
+    os.system('wget %s -O %s' % (link, pdfpath))
+
+  size = size + get_download_size(barcode)
+  os.system('rm -rf ./%s' % (barcode))
+  print '____________________________________________________________'
+  return size
 
 
 if __name__ == '__main__':
